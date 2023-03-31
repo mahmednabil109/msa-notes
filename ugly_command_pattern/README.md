@@ -10,8 +10,8 @@ That's the wikipedia definition, but more intuitively when you need to decouble 
 
 The most OVER-used example when explaining this pattern is the Remote Controller. Here the Remote is only interested in the computation itself, in this case (_e.g. switching of the light, etc_) and it's consider good desing when decoupling the Remote from the controled devices themselves. By using the Command Pattern - in its simplest forms - the desing should follow this UML desing.
 
-<p align="cetenr">
-     <img src="" alt="COMMAND UML DESING"/>
+<p align="center">
+     <img src="../assets/command_uml.png" alt="COMMAND UML DESING"/>
 </p>
 
 In Code, this will look something like this.
@@ -93,7 +93,7 @@ public static class SwitchOffCommand implements Command {
      }
 }
 ```
-Here both `SwitchOffCommand` & `SwtichOnCommand` encapsulate their actions and the `UglyRemote` need not to know any thing about `LampDevice`. The code that will use the UglyRemote might be like this:
+Here both `SwitchOffCommand` & `SwtichOnCommand` encapsulate their actions and the `UglyRemote` does not need to know any thing about `LampDevice`. The code that will use the UglyRemote might be like this:
 
 ```java
 LampDevice lamp = new LampDevice();
@@ -118,7 +118,7 @@ Let's set our goals here :-
 2. concrete commands shoud be instantiated at run time and correctly injected to the remote object constructor.
 3. The injection shall be based on some meta data (i.e. data not necessary in the code at compile time).
 
-// TODO ADD ANNOTATION EXPL.
+> 📓 note: we will extensively use a feature in java called annotations, if you are not familiar with it [this](https://blogs.oracle.com/javamagazine/post/annotations-an-inside-look) is a good start.
 
 `Reflection` & `Annotations` will come in handy to achive these goals. First, we will add annotations around the concrete classes in order for the reflection code to know that they are there.
 ```java
@@ -131,7 +131,7 @@ public static class SwitchOnCommand implements Command {
 public static class SwitchOffCommand implements Command {
 ```
 
-and in order for the reflection code to inject these objects correctly into the Remote Object correctly - you guessed it - we will add annotations around the parameters of the constructor with a name similar to one of the concrete classes, for example:
+and in order for the reflection code to inject these objects correctly into the Remote Object - you guessed it - we will add annotations around the parameters of the constructor with a name similar to one of the concrete classes, for example:
 ```java
 public UglyRemote(@Core.Use(name = "SwitchOffCommand") Command command) {
 ```
@@ -148,13 +148,13 @@ With that being added, it's now the role of the reflection code to connect these
 4. Finally, pass these parameters to the chosen constructor to create the Remote Object.
 Coding these steps.
 
-// TODO EXPL. THE CODE
 ```java
+Class cls = OurClassToCreate.class;
 Constructor c = null;
+// this for loop is to get the annotated constructor
 for(var _c : cls.getDeclaredConstructors()){
     var parameter_count = _c.getParameterCount();
     var annotation_count = _c.getParameterAnnotations().length;
-    // TODO check if known annotation
     if(parameter_count == annotation_count){
         c = _c;
         break;
@@ -164,17 +164,76 @@ if(c == null) return null;
 var parameter_count = c.getParameterCount();
 Object params[] = new Object[parameter_count];
 var parameters =  c.getParameters();
-
+// after that we construct the needed parameters based on the class mappings in the registery
 for(int i=0; i< parameter_count; i++){
     var command_annotation = parameters[i].getAnnotation(Use.class);
     Class<?> param_x_cls = this.registery.get(command_annotation.name());
     params[i] = param_x_cls.getDeclaredConstructor(LampDevice.class).newInstance(new LampDevice());
 }
-return (T) c.newInstance(params);
+
+OurClassToCreate the_object = (OurClassToCreate) c.newInstance(params);
+```
+## Notes
+why should we use this:
+- becuase it's very safe.
+```java
+     public static void main(String args[]) throws NoSuchMethodException, ClassNotFoundException, IOException, URISyntaxException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, SecurityException {
+```
+- performant 😳.
+```java
+  private static Class<?>[] getClasses(String packageName)
+               throws ClassNotFoundException, IOException, URISyntaxException {
+          ...
+          while (resources.hasMoreElements()) {
+             ...
+          }
+          ArrayList<Class<?>> classes = new ArrayList<Class<?>>();
+          for (File directory : dirs) {
+               classes.addAll(findClasses(directory, packageName));
+          }
+          return classes.toArray(new Class[classes.size()]);
+     }
+
+     private static List<Class<?>> findClasses(File directory, String packageName) throws ClassNotFoundException {
+          List<Class<?>> classes = new ArrayList<Class<?>>();
+          if (!directory.exists()) {
+               return classes;
+          }
+          File[] files = directory.listFiles();
+          for (File file : files) {
+              ...
+          }
+          return classes;
+     }
+
+     public void init(String pkg) throws ClassNotFoundException, IOException, URISyntaxException{
+          this.registery = new HashMap<>();
+          Class<?> classes[] = getClasses(pkg);
+          for(var cls : classes){
+               for(var annotation : cls.getAnnotations())
+                    ...
+          }
+     }
+
+     public <T> T getInstance(Class<T> cls) throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException{
+          Constructor c = null;
+          for(var _c : cls.getDeclaredConstructors()){
+               var parameter_count = _c.getParameterCount();
+               var annotation_count = _c.getParameterAnnotations().length;
+              ...
+          }
+         ...
+          
+          for(int i=0; i< parameter_count; i++){
+              ...
+          }
+          return (T) c.newInstance(params);
+     }
 ```
 
-## Example
-👉[see the code](./Main.java)👈
+- But really, the main benefit is its flexabilty with which we can achieve higher levels of decoupling, but this must by in an isolated/well tested layer burried down deep in the application logic. If the other developers have to deal with reflection code quite often or it's in a higher layer of the application that is a horrible/most probably wrong desing.
 
-## TODOs
-- [ ] make the DI framework inject commands based on `props.txt`
+## Example
+👉[run/play with the code](./Main.java)👈
+
+This example show a simple [dependency injection library](./DI_FrameWork/Core.java) that relies on a `props.txt` to dynamicly inject concrete commands into any class with annotated arguments.
