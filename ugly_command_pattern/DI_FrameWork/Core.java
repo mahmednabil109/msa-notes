@@ -89,7 +89,7 @@ public class Core{
           
           for(int i=0; i< parameter_count; i++){
                var command_annotation = parameters[i].getAnnotation(Use.class);
-               Class<?> param_x_cls = this.registery.get(command_annotation.name());
+               Class<?> param_x_cls = this.registery.get(command_annotation.name()); 
                params[i] = param_x_cls.getDeclaredConstructor(LampDevice.class).newInstance(new LampDevice());
           }
           return (T) c.newInstance(params);
